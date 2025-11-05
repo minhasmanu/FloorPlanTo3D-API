@@ -83,7 +83,13 @@ class MeshBuilder:
             invert_normals=True,
         )
 
-    def create_mesh(self, name: str, indices = None, vertices = None, invert_normals = False):
+    def create_mesh(self, name: "str | list[str]", indices = None, vertices = None, invert_normals = False):
+        if type(name) == str:
+            names = [name]
+        else:
+            names = name
+            name = names[0]
+
         if indices is None:
             indices = self.index_stack
             self.index_stack = []
@@ -185,8 +191,9 @@ class MeshBuilder:
             mode=PrimitiveMode.TRIANGLES.value,
         )
 
-        mesh = create(self.gltf_meshes, Mesh(primitives=[primitive], name="SquareMesh"))
-        create(self.gltf_nodes, Node(mesh=mesh, name=name))
+        mesh = create(self.gltf_meshes, Mesh(primitives=[primitive], name=name))
+        for node_name in names:
+            create(self.gltf_nodes, Node(mesh=mesh, name=node_name))
 
     def build(self):
         model = GLTFModel(

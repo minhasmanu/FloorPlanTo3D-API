@@ -412,7 +412,7 @@ def build_3d_model(data: dict):
                 [x2, y1, 0],
             )
 
-        builder.create_mesh(f"Room_{name}")
+        builder.create_mesh([f"Room_{name}", f"Floor_r{name}"])
 
     height = 2.6
 
