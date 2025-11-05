@@ -448,9 +448,19 @@ def build_3d_model(data: dict):
         if wall.type == "window":
             builder.add_cube(x1, y1, x2, y2, 0, height / 3)
             builder.add_cube(x1, y1, x2, y2, height * 2/3, height)
+        elif wall.type == "door":
+            # Door normally do not reach the ceiling, to achieve this, create we shorter doors and
+            # then put wall above. Average height of doors is 200cm relative to ceiling height 260cm,
+            # to keep this for any height use a ratio. The wall object is also create separately for
+            # applying textures.
+            builder.add_cube(x1, y1, x2, y2, 0, height * (10/13))
         else:
             builder.add_cube(x1, y1, x2, y2, 0, height)
         builder.create_mesh(f"{wall.type.capitalize()}_{index}")
+
+        if wall.type == "door":
+            builder.add_cube(x1, y1, x2, y2, height * (10/13), height)
+            builder.create_mesh(f"Wall_{index}")
     
     return builder.build()
 
