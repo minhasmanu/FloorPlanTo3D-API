@@ -470,29 +470,6 @@ def build_3d_model(data: dict, sample_image: "Callable[[float, float], bool] | N
         x2 = wall.x2
         y2 = wall.y2
 
-        if wall.type == "door" or wall.type == "window":
-            thickness = wall.get_height() if wall.is_horizontal() else wall.get_width()
-            new_thickness = 0.2
-            if new_thickness > thickness:
-                new_thickness = 0.8 * thickness
-
-            builder.add_quad(
-                [x1, y1, 0],
-                [x1, y2, 0],
-                [x2, y2, 0],
-                [x2, y1, 0],
-            )
-            builder.create_mesh(f"Floor_{index}")
-
-            if wall.is_horizontal():
-                center = (y1 + y2) * 0.5
-                y1 = center - new_thickness * 0.5
-                y2 = center + new_thickness * 0.5
-            else:
-                center = (x1 + x2) * 0.5
-                x1 = center - new_thickness * 0.5
-                x2 = center + new_thickness * 0.5
-
         if wall.type == "window":
             builder.add_cube(x1, y1, x2, y2, 0, height / 3)
             builder.add_cube(x1, y1, x2, y2, height * 2/3, height)
