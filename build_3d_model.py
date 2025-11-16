@@ -1,7 +1,8 @@
 from bisect import bisect_left
 from json import loads
+import random
 from sys import argv
-from typing import Any
+from typing import Any, Callable
 from dataclasses import dataclass, field
 import numpy as np
 from MeshBuilder import MeshBuilder
@@ -254,7 +255,7 @@ def walls_to_json(walls: "list[Wall]"):
 def build_geometry(walls: "list[Wall]"):
     pass
 
-def find_rooms(walls: "list[Wall]", tolerance: float):
+def find_rooms(walls: "list[Wall]", tolerance: float, sample_image: "Callable[[float, float], bool] | None" = None):
     x_grid: "list[float]" = []
     y_grid: "list[float]" = []
 
@@ -300,22 +301,41 @@ def find_rooms(walls: "list[Wall]", tolerance: float):
             cell_width = x2 - x1
             cell_height = y2 - y1
 
-            is_small_enough = (cell_height < tolerance * 3 and cell_width < tolerance * 3)
-            if not is_small_enough:
-                continue
-            
-            is_between_walls = ((tiles[(x - 1) + y * width] == 0) \
-                and (tiles[(x + 1) + y * width] == 0)) \
-                or ((tiles[x + (y - 1) * width] == 0) \
-                and (tiles[x + (y + 1) * width] == 0))
+            is_gap_vertical = cell_height < tolerance * 3 and tiles[x + (y - 1) * width] == 0 and tiles[x + (y + 1) * width] == 0
+            is_gap_horizontal = cell_width < tolerance * 3 and tiles[(x - 1) + y * width] == 0 and tiles[(x + 1) + y * width] == 0
 
-            if not is_between_walls:
+            if not is_gap_horizontal and not is_gap_vertical:
                 continue
 
             print(f"Fixing gap {(x1, y1, x2, y2)}")
 
             tiles[x + y * width] = 0
             walls.append(Wall(x1, y1, x2, y2, "wall")) # type: ignore
+    
+    # Find missing walls by checking the image for every empty cell. By randomly sampling pixels, if the cell is 80% black pixels, it's probably a wall.
+    if sample_image is not None:
+        for y, (y1, y2) in enumerate(zip(y_grid, y_grid[1:])):
+            for x, (x1, x2) in enumerate(zip(x_grid, x_grid[1:])):
+                if tiles[x + y * width] == 0:
+                    continue
+
+                black = 0
+                count = 8
+
+                for _ in range(count):
+                    xi = random.uniform(x1, x2)
+                    yi = random.uniform(y1, y2)
+                    is_white = sample_image(xi, yi)
+                    if not is_white:
+                        black += 1
+
+                if black / count < 0.8:
+                    continue
+
+                print(f"Fixing missing wall {(x1, y1, x2, y2)}")
+
+                tiles[x + y * width] = 0
+                walls.append(Wall(x1, y1, x2, y2, "wall")) # type: ignore
     
     room_id = 1
     directions = [(0, 1), (0, -1), (1, 0), (-1, 0)]
@@ -414,18 +434,21 @@ def find_rooms(walls: "list[Wall]", tolerance: float):
     print(f"Room grid: {width} x {height}, Room Count: {room_id - 1}")
     return room_meshes
 
-def build_3d_model(data: dict):
+def get_normalizer(data: dict):
+    return 1 / (data["averageDoor"] / 0.8)
+
+def build_3d_model(data: dict, sample_image: "Callable[[float, float], bool] | None" = None):
     walls = walls_from_json(data)
     align_walls(walls)
-    data["points"] = walls_to_json(walls)
 
-    normalizer = 1 / (data["averageDoor"] / 0.8)
+    normalizer = get_normalizer(data)
     for wall in walls:
         wall.normalize(normalizer)
 
-
     builder = MeshBuilder()
-    rooms = find_rooms(walls, tolerance=0.05)
+    rooms = find_rooms(walls, tolerance=0.05, sample_image=sample_image)
+    data["points"] = walls_to_json(walls)
+
     for name in rooms.keys():
         quads = rooms[name]
 

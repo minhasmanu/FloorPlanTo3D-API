@@ -6,7 +6,7 @@ import numpy
 
 
 
-from build_3d_model import build_3d_model
+from build_3d_model import build_3d_model, get_normalizer
 from mrcnn.config import Config
 
 from mrcnn.model import MaskRCNN
@@ -18,7 +18,7 @@ from skimage.color import gray2rgb
 
 from io import BytesIO
 from numpy import expand_dims
-from flask import Flask, request,send_file
+from flask import Flask, jsonify, request,send_file
 
 from mrcnn.model import mold_image
 
@@ -135,7 +135,7 @@ def prediction():
 	global cfg
 	imagefile = PIL.Image.open(request.files['image'].stream)
 	image,w,h=myImageLoader(imagefile)
-	print(h,w)
+	print(w, h, image.shape)
 	scaled_image = mold_image(image, cfg)
 	sample = expand_dims(scaled_image, 0)
 
@@ -156,7 +156,19 @@ def prediction():
 	data['Height']=h
 	data['averageDoor']=averageDoor
 
-	gltf = build_3d_model(data)
+	scale = 1 / get_normalizer(data)
+	def sample(x, y):
+		x *= scale
+		y *= scale
+		r, g, b = image[int(y), int(x)]
+		is_white = r > 64 and g > 64 and b > 64
+		return is_white
+
+	gltf = build_3d_model(data, sample_image=sample)
+
+	if request.headers.get("Accept") == "application/json":
+		return jsonify(data)
+
 	bytes = BytesIO()
 	gltf.write_glb(bytes)
 	bytes.seek(0)
