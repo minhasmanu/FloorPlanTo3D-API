@@ -291,6 +291,31 @@ def find_rooms(walls: "list[Wall]", tolerance: float):
                     and wall.y1 < center_y < wall.y2:
                     tiles[x + y * width] = 0
                     break
+
+    for y, (y1, y2) in enumerate(zip(y_grid, y_grid[1:])):
+        for x, (x1, x2) in enumerate(zip(x_grid, x_grid[1:])):
+            if x == 0 or x == width - 1 or y == 0 or y == height - 1 or tiles[x + y * width] == 0:
+                continue 
+
+            cell_width = x2 - x1
+            cell_height = y2 - y1
+
+            is_small_enough = (cell_height < tolerance * 3 and cell_width < tolerance * 3)
+            if not is_small_enough:
+                continue
+            
+            is_between_walls = ((tiles[(x - 1) + y * width] == 0) \
+                and (tiles[(x + 1) + y * width] == 0)) \
+                or ((tiles[x + (y - 1) * width] == 0) \
+                and (tiles[x + (y + 1) * width] == 0))
+
+            if not is_between_walls:
+                continue
+
+            print(f"Fixing gap {(x1, y1, x2, y2)}")
+
+            tiles[x + y * width] = 0
+            walls.append(Wall(x1, y1, x2, y2, "wall")) # type: ignore
     
     room_id = 1
     directions = [(0, 1), (0, -1), (1, 0), (-1, 0)]
