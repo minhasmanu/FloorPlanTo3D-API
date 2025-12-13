@@ -262,20 +262,42 @@ def find_rooms(walls: "list[Wall]", tolerance: float, sample_image: "Callable[[f
         index = bisect_left(grid, position)
         neighbour_min = grid[index - 1] if 0 <= index - 1 < len(grid) else None
         if neighbour_min is not None and abs(position - neighbour_min) < tolerance:
-            return
+            return neighbour_min
 
         neighbour_max = grid[index] if 0 <= index < len(grid) else None
         if neighbour_max is not None and abs(position - neighbour_max) < tolerance:
-            return
+            return neighbour_max
         
         grid.insert(index, position)
+        return position
 
+    average_wall_thickness_sum = 0
 
     for wall in walls:
-        push_grid_line(x_grid, wall.x1)
-        push_grid_line(x_grid, wall.x2)
-        push_grid_line(y_grid, wall.y1)
-        push_grid_line(y_grid, wall.y2)
+        wall.x1 = push_grid_line(x_grid, wall.x1)
+        wall.x2 = push_grid_line(x_grid, wall.x2)
+
+        wall.y1 = push_grid_line(y_grid, wall.y1)
+        wall.y2 = push_grid_line(y_grid, wall.y2)
+
+        average_wall_thickness_sum += wall.get_height() if wall.is_horizontal() else wall.get_width()
+
+    # Create virtual walls on the edges of the grid for handling the model sometimes not detecting boundary walls 
+    average_wall_thickness = average_wall_thickness_sum / len(walls)
+
+    x_start = x_grid[0]
+    x_end = x_grid[-1]
+    push_grid_line(x_grid, x_start + average_wall_thickness)
+    push_grid_line(x_grid, x_start - average_wall_thickness)
+    push_grid_line(x_grid, x_end + average_wall_thickness)
+    push_grid_line(x_grid, x_end - average_wall_thickness)
+
+    y_start = y_grid[0]
+    y_end = y_grid[-1]
+    push_grid_line(y_grid, y_start + average_wall_thickness)
+    push_grid_line(y_grid, y_start - average_wall_thickness)
+    push_grid_line(y_grid, y_end + average_wall_thickness)
+    push_grid_line(y_grid, y_end - average_wall_thickness)
     
     width = len(x_grid) - 1
     height = len(y_grid) - 1
