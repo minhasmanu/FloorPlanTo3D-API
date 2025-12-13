@@ -255,6 +255,7 @@ def build_geometry(walls: "list[Wall]"):
     pass
 
 def find_rooms(walls: "list[Wall]", tolerance: float, sample_image: "Callable[[float, float], bool] | None" = None):
+    # Discretize the floorplan into a grid based on wall coordinates
     x_grid: "list[float]" = []
     y_grid: "list[float]" = []
 
@@ -273,6 +274,7 @@ def find_rooms(walls: "list[Wall]", tolerance: float, sample_image: "Callable[[f
 
     average_wall_thickness_sum = 0
 
+    # Create the grid based on the walls while also snapping their boundaries to the grid
     for wall in walls:
         wall.x1 = push_grid_line(x_grid, wall.x1)
         wall.x2 = push_grid_line(x_grid, wall.x2)
@@ -299,6 +301,10 @@ def find_rooms(walls: "list[Wall]", tolerance: float, sample_image: "Callable[[f
     push_grid_line(y_grid, y_end + average_wall_thickness)
     push_grid_line(y_grid, y_end - average_wall_thickness)
     
+    # Create the grid. The values are so:
+    # -1  => Unassigned empty cell
+    #  0  => Wall
+    # ≥ 1 => Assigned to a specific room
     width = len(x_grid) - 1
     height = len(y_grid) - 1
     tiles: "list[int]" = [-1] * (width * height)
@@ -349,6 +355,7 @@ def find_rooms(walls: "list[Wall]", tolerance: float, sample_image: "Callable[[f
             cell_width = x2 - x1
             cell_height = y2 - y1
 
+            # Detect the presence of neighbouring walls
             is_gap_vertical = cell_height < tolerance * 3 and tiles[x + (y - 1) * width] == 0 and tiles[x + (y + 1) * width] == 0
             is_gap_horizontal = cell_width < tolerance * 3 and tiles[(x - 1) + y * width] == 0 and tiles[(x + 1) + y * width] == 0
 
@@ -389,6 +396,8 @@ def find_rooms(walls: "list[Wall]", tolerance: float, sample_image: "Callable[[f
 
                 room_id += 1
 
+    # Create polygons out of the created rooms via greedy meshing. A room is ideally one rectangle,
+    # but if the shape is more complex, we create a list of rectangles associated with each room
     occupied = [0] * len(tiles)
     room_meshes: "dict[int, list[tuple[float, float, float, float]]]" = {}
     for y in range(height):
@@ -436,6 +445,7 @@ def find_rooms(walls: "list[Wall]", tolerance: float, sample_image: "Callable[[f
                 y_grid[iy],
             ))
     
+    # Delete the rooms that are outside, which means they touch the edge of the grid
     for x in range(width):
         room_id = tiles[x]
         if room_id != 0 and room_id in room_meshes:
