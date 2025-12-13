@@ -456,24 +456,39 @@ def find_rooms(walls: "list[Wall]", tolerance: float, sample_image: "Callable[[f
                 y_grid[iy],
             ))
     
-    # Delete the rooms that are outside, which means they touch the edge of the grid
+    # Delete the rooms that are outside, which means they touch the edge of the grid. It may be the
+    # case that a wall was not detected, exposing the inside to the outside, in which case the room
+    # would be erroneously deleted. To handle this, only delete a room if it's small enough
+    total_area = (x_end - x_start) * (y_end - y_start)
+    def delete_outside_room(room_id: int):
+        room_mesh = room_meshes[room_id]
+        room_area = 0
+
+        for (x1, y1, x2, y2) in room_mesh:
+            room_area += (x2 - x1) * (y2 - y1)
+
+        if room_area > total_area * 0.5:
+            return
+
+        del room_meshes[room_id]
+
     for x in range(width):
         room_id = tiles[x]
         if room_id != 0 and room_id in room_meshes:
-            del room_meshes[room_id]
+            delete_outside_room(room_id)
 
         room_id = tiles[x + (width * (height - 1))]
         if room_id != 0 and room_id in room_meshes:
-            del room_meshes[room_id]
+            delete_outside_room(room_id)
 
     for y in range(height):
         room_id = tiles[y * width]
         if room_id != 0 and room_id in room_meshes:
-            del room_meshes[room_id]
+            delete_outside_room(room_id)
 
         room_id = tiles[y * width + width - 1]
         if room_id != 0 and room_id in room_meshes:
-            del room_meshes[room_id]
+            delete_outside_room(room_id)
             
     print(f"Room grid: {width} x {height}, Room Count: {room_id - 1}")
     return room_meshes
