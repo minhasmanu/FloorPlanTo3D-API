@@ -1,6 +1,5 @@
 from bisect import bisect_left
 from json import loads
-import random
 from sys import argv
 from typing import Any, Callable
 from dataclasses import dataclass, field
@@ -293,6 +292,33 @@ def find_rooms(walls: "list[Wall]", tolerance: float, sample_image: "Callable[[f
                     tiles[x + y * width] = 0
                     break
 
+    # Find missing walls by checking the image for every empty cell. By sampling pixels, if the cell is 80% black pixels, it's probably a wall.
+    if sample_image is not None:
+        for y, (y1, y2) in enumerate(zip(y_grid, y_grid[1:])):
+            for x, (x1, x2) in enumerate(zip(x_grid, x_grid[1:])):
+                if tiles[x + y * width] == 0:
+                    continue
+
+                black = 0
+                count = 16
+
+                for sx in range(1, 5):
+                    for sy in range(1, 5):
+                        xi = x1 + (x2 - x1) * (sx / 5)
+                        yi = y1 + (y2 - y1) * (sy / 5)
+                        is_white = sample_image(xi, yi)
+                        if not is_white:
+                            black += 1
+
+                if black / count < 0.5:
+                    continue
+
+                print(f"Fixing missing wall {(x1, y1, x2, y2)}")
+
+                tiles[x + y * width] = 0
+                walls.append(Wall(x1, y1, x2, y2, "wall")) # type: ignore
+    
+    # Fill in gaps between walls
     for y, (y1, y2) in enumerate(zip(y_grid, y_grid[1:])):
         for x, (x1, x2) in enumerate(zip(x_grid, x_grid[1:])):
             if x == 0 or x == width - 1 or y == 0 or y == height - 1 or tiles[x + y * width] == 0:
@@ -311,31 +337,6 @@ def find_rooms(walls: "list[Wall]", tolerance: float, sample_image: "Callable[[f
 
             tiles[x + y * width] = 0
             walls.append(Wall(x1, y1, x2, y2, "wall")) # type: ignore
-    
-    # Find missing walls by checking the image for every empty cell. By randomly sampling pixels, if the cell is 80% black pixels, it's probably a wall.
-    if sample_image is not None:
-        for y, (y1, y2) in enumerate(zip(y_grid, y_grid[1:])):
-            for x, (x1, x2) in enumerate(zip(x_grid, x_grid[1:])):
-                if tiles[x + y * width] == 0:
-                    continue
-
-                black = 0
-                count = 8
-
-                for _ in range(count):
-                    xi = random.uniform(x1, x2)
-                    yi = random.uniform(y1, y2)
-                    is_white = sample_image(xi, yi)
-                    if not is_white:
-                        black += 1
-
-                if black / count < 0.8:
-                    continue
-
-                print(f"Fixing missing wall {(x1, y1, x2, y2)}")
-
-                tiles[x + y * width] = 0
-                walls.append(Wall(x1, y1, x2, y2, "wall")) # type: ignore
     
     room_id = 1
     directions = [(0, 1), (0, -1), (1, 0), (-1, 0)]
@@ -446,7 +447,7 @@ def build_3d_model(data: dict, sample_image: "Callable[[float, float], bool] | N
         wall.normalize(normalizer)
 
     builder = MeshBuilder()
-    rooms = find_rooms(walls, tolerance=0.05, sample_image=sample_image)
+    rooms = find_rooms(walls, tolerance=0.1, sample_image=sample_image)
     data["points"] = walls_to_json(walls)
 
     for name in rooms.keys():

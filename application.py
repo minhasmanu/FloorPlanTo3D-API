@@ -54,7 +54,7 @@ class PredictionConfig(Config):
 	# simplify GPU config
 	GPU_COUNT = 1
 	IMAGES_PER_GPU = 1
-	DETECTION_MIN_CONFIDENCE = 0.25
+	DETECTION_MIN_CONFIDENCE = 0.1
 	
 @application.before_first_request
 def load_model():
