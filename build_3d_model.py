@@ -276,6 +276,17 @@ def find_rooms(walls: "list[Wall]", tolerance: float, sample_image: "Callable[[f
 
     # Create the grid based on the walls while also snapping their boundaries to the grid
     for wall in walls:
+        # If some walls are too thin, they will be flattened, increase their thickness so that does not happen
+        if wall.x2 - wall.x1 < tolerance * 2:
+            center = (wall.x1 + wall.x2) * 0.5
+            wall.x1 = center - tolerance
+            wall.x2 = center + tolerance
+
+        if wall.y2 - wall.y1 < tolerance * 2:
+            center = (wall.y1 + wall.y2) * 0.5
+            wall.y1 = center - tolerance
+            wall.y2 = center + tolerance
+
         wall.x1 = push_grid_line(x_grid, wall.x1)
         wall.x2 = push_grid_line(x_grid, wall.x2)
 
