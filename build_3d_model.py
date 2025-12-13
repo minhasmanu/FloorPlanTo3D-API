@@ -1,5 +1,6 @@
 from bisect import bisect_left
 from json import loads
+from math import inf
 from sys import argv
 from typing import Any, Callable
 from dataclasses import dataclass, field
@@ -259,14 +260,20 @@ def find_rooms(walls: "list[Wall]", tolerance: float, sample_image: "Callable[[f
     x_grid: "list[float]" = []
     y_grid: "list[float]" = []
 
+    grid_tolerance = inf
+    for wall in walls:
+        grid_tolerance = min(grid_tolerance, wall.get_width(), wall.get_height())
+
+    grid_tolerance *= 0.75
+
     def push_grid_line(grid: "list[float]", position: float):
         index = bisect_left(grid, position)
         neighbour_min = grid[index - 1] if 0 <= index - 1 < len(grid) else None
-        if neighbour_min is not None and abs(position - neighbour_min) < tolerance:
+        if neighbour_min is not None and abs(position - neighbour_min) < grid_tolerance:
             return neighbour_min
 
         neighbour_max = grid[index] if 0 <= index < len(grid) else None
-        if neighbour_max is not None and abs(position - neighbour_max) < tolerance:
+        if neighbour_max is not None and abs(position - neighbour_max) < grid_tolerance:
             return neighbour_max
         
         grid.insert(index, position)
@@ -277,15 +284,15 @@ def find_rooms(walls: "list[Wall]", tolerance: float, sample_image: "Callable[[f
     # Create the grid based on the walls while also snapping their boundaries to the grid
     for wall in walls:
         # If some walls are too thin, they will be flattened, increase their thickness so that does not happen
-        if wall.x2 - wall.x1 < tolerance * 2:
+        if wall.x2 - wall.x1 < grid_tolerance * 2:
             center = (wall.x1 + wall.x2) * 0.5
-            wall.x1 = center - tolerance
-            wall.x2 = center + tolerance
+            wall.x1 = center - grid_tolerance * 1.2
+            wall.x2 = center + grid_tolerance * 1.2
 
-        if wall.y2 - wall.y1 < tolerance * 2:
+        if wall.y2 - wall.y1 < grid_tolerance * 2:
             center = (wall.y1 + wall.y2) * 0.5
-            wall.y1 = center - tolerance
-            wall.y2 = center + tolerance
+            wall.y1 = center - grid_tolerance * 1.2
+            wall.y2 = center + grid_tolerance * 1.2
 
         wall.x1 = push_grid_line(x_grid, wall.x1)
         wall.x2 = push_grid_line(x_grid, wall.x2)
@@ -331,7 +338,7 @@ def find_rooms(walls: "list[Wall]", tolerance: float, sample_image: "Callable[[f
                     tiles[x + y * width] = 0
                     break
 
-    # Find missing walls by checking the image for every empty cell. By sampling pixels, if the cell is 80% black pixels, it's probably a wall.
+    # Find missing walls by checking the image for every empty cell. By sampling pixels, if the cell is 75% black pixels, it's probably a wall.
     if sample_image is not None:
         for y, (y1, y2) in enumerate(zip(y_grid, y_grid[1:])):
             for x, (x1, x2) in enumerate(zip(x_grid, x_grid[1:])):
@@ -339,17 +346,19 @@ def find_rooms(walls: "list[Wall]", tolerance: float, sample_image: "Callable[[f
                     continue
 
                 black = 0
-                count = 16
+                count = 0
 
                 for sx in range(1, 5):
                     for sy in range(1, 5):
                         xi = x1 + (x2 - x1) * (sx / 5)
                         yi = y1 + (y2 - y1) * (sy / 5)
                         is_white = sample_image(xi, yi)
+
+                        count += 1
                         if not is_white:
                             black += 1
 
-                if black / count < 0.5:
+                if black / count < 0.75:
                     continue
 
                 print(f"Fixing missing wall {(x1, y1, x2, y2)}")
@@ -408,28 +417,29 @@ def find_rooms(walls: "list[Wall]", tolerance: float, sample_image: "Callable[[f
                 room_id += 1
 
     # Create polygons out of the created rooms via greedy meshing. A room is ideally one rectangle,
-    # but if the shape is more complex, we create a list of rectangles associated with each room
+    # but if the shape is more complex, we create a list of rectangles associated with each room.
+    # The reason we start at 1 and stop at the penultimate tile is to ignore the cells created for virtual walls.
     occupied = [0] * len(tiles)
     room_meshes: "dict[int, list[tuple[float, float, float, float]]]" = {}
-    for y in range(height):
-        for x in range(width):
+    for y in range(1, height - 1):
+        for x in range(1, width - 1):
             room_id = tiles[x + y * width]
             if room_id == 0 or occupied[x + y * width] != 0:
                 continue
 
             iy = y + 1
-            for iy in range(iy, height):
+            for iy in range(iy, height - 1):
                 if tiles[x + iy * width] != room_id or occupied[x + iy * width] != 0:
                     break
 
-            if iy == width:
+            if iy == height:
                 iy -= 1
 
             if y == iy:
                 continue
             
             ix = x + 1
-            for ix in range(ix, width):
+            for ix in range(ix, width - 1):
                 failed = False
 
                 for jy in range(y, iy):
