@@ -45,7 +45,6 @@ WEIGHTS_FILE_NAME = 'maskrcnn_15_epochs.h5'
 application=Flask(__name__)
 cors = CORS(application, resources={r"/*": {"origins": "*"}})
 
-
 class PredictionConfig(Config):
 	# define the name of the configuration
 	NAME = "floorPlan_cfg"
