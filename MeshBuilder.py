@@ -5,6 +5,7 @@ import numpy as np
 from gltflib import (GLTF, Accessor, AccessorType, Asset, Attributes, Buffer,
                      BufferView, ComponentType, FileResource, GLTFModel, Mesh,
                      Node, Primitive, PrimitiveMode, Scene)
+from gltflib.models import Material, PBRMetallicRoughness
 
 def create(list: list, resource: "Any"):
     id = len(list)
@@ -19,8 +20,10 @@ class MeshBuilder:
         self.gltf_buffer_views: "list[BufferView]" = []
         self.gltf_accessors: "list[Accessor]" = []
         self.gltf_meshes: "list[Mesh]" = []
+        self.gltf_materials: "list[Material]" = []
         self.vertex_stack: "list[list[float]]" = []
         self.index_stack: "list[int]" = []
+        self._door_material_index: "int | None" = None
         pass
     
     def add_quad(self, a, b, c, d, invert_normals = False):
@@ -177,18 +180,34 @@ class MeshBuilder:
         index_accessor = create(self.gltf_accessors, Accessor(
             bufferView=index_buffer_id,
             byteOffset=0,
-            componentType=ComponentType.UNSIGNED_SHORT, # Corresponds to np.uint16
+            componentType=ComponentType.UNSIGNED_SHORT,  # Corresponds to np.uint16
             count=len(indices),
-            type=AccessorType.SCALAR.value, # Single value per index
+            type=AccessorType.SCALAR.value,  # Single value per index
         ))
+
+        # Determine material (brown for doors)
+        material_index = None
+        if isinstance(name, str) and name.startswith("Door_"):
+            # Reuse a single brown material for all doors
+            if self._door_material_index is None:
+                pbr = PBRMetallicRoughness(
+                    baseColorFactor=[0.55, 0.27, 0.07, 1.0],  # brown RGBA
+                )
+                material = Material(
+                    name="DoorBrown",
+                    pbrMetallicRoughness=pbr,
+                )
+                self._door_material_index = create(self.gltf_materials, material)
+            material_index = self._door_material_index
 
         # 5. Build the Mesh Primitive
 
         # A Primitive is the actual drawing geometry (e.g., a set of triangles).
         primitive = Primitive(
-            attributes=Attributes(POSITION=position_accessor), # POSITION uses the first accessor (index 0)
-            indices=index_accessor, # Indices use the second accessor (index 1)
+            attributes=Attributes(POSITION=position_accessor),  # POSITION uses the first accessor (index 0)
+            indices=index_accessor,  # Indices use the second accessor (index 1)
             mode=PrimitiveMode.TRIANGLES.value,
+            material=material_index,
         )
 
         mesh = create(self.gltf_meshes, Mesh(primitives=[primitive], name=name))
@@ -203,7 +222,8 @@ class MeshBuilder:
             meshes=self.gltf_meshes,
             buffers=self.gltf_buffers,
             bufferViews=self.gltf_buffer_views,
-            accessors=self.gltf_accessors
+            accessors=self.gltf_accessors,
+            materials=self.gltf_materials,
         )
 
         return GLTF(model=model, resources=self.gltf_resources)
