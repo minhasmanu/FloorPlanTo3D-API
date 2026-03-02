@@ -1,6 +1,6 @@
 from bisect import bisect_left
 from json import loads
-from math import inf
+from math import inf, cos, sin, radians
 from sys import argv
 from typing import Any, Callable
 from dataclasses import dataclass, field
@@ -539,20 +539,70 @@ def build_3d_model(data: dict, sample_image: "Callable[[float, float], bool] | N
         x2 = wall.x2
         y2 = wall.y2
 
+        def add_hinged_door(builder: MeshBuilder, x1: float, y1: float, x2: float, y2: float, z1: float, z2: float):
+            """
+            Create a door as an oriented box, rotated 45° around the hinge at (x1, y1),
+            without scaling its size.
+            """
+            angle = radians(75.0)
+            c = cos(angle)
+            s = sin(angle)
+
+            # Original rectangle corners in floor plane
+            p0 = (x1, y1)          # hinge corner
+            p1 = (x2, y1)
+            p2 = (x2, y2)
+            p3 = (x1, y2)
+
+            def rotate_point(px: float, py: float):
+                dx = px - x1
+                dy = py - y1
+                rx = x1 + dx * c - dy * s
+                ry = y1 + dx * s + dy * c
+                return rx, ry
+
+            r0 = p0  # hinge stays fixed
+            r1 = rotate_point(*p1)
+            r2 = rotate_point(*p2)
+            r3 = rotate_point(*p3)
+
+            # Build 3D vertices (bottom z1, top z2)
+            v0 = [r0[0], r0[1], z1]
+            v1 = [r1[0], r1[1], z1]
+            v2 = [r2[0], r2[1], z1]
+            v3 = [r3[0], r3[1], z1]
+
+            v4 = [r0[0], r0[1], z2]
+            v5 = [r1[0], r1[1], z2]
+            v6 = [r2[0], r2[1], z2]
+            v7 = [r3[0], r3[1], z2]
+
+            # Bottom face
+            builder.add_quad(v0, v1, v2, v3, invert_normals=True)
+            # Top face
+            builder.add_quad(v4, v7, v6, v5)
+            # Sides
+            builder.add_quad(v0, v4, v5, v1)   # along hinge edge
+            builder.add_quad(v1, v5, v6, v2)
+            builder.add_quad(v2, v6, v7, v3)
+            builder.add_quad(v3, v7, v4, v0)
+
         if wall.type == "window":
             builder.add_cube(x1, y1, x2, y2, 0, height / 3)
             builder.add_cube(x1, y1, x2, y2, height * 2/3, height)
         elif wall.type == "door":
+            # Door opening: rotated 45° around the hinge at (x1, y1) without scaling
             # Door normally do not reach the ceiling, to achieve this, create we shorter doors and
             # then put wall above. Average height of doors is 200cm relative to ceiling height 260cm,
             # to keep this for any height use a ratio. The wall object is also create separately for
             # applying textures.
-            builder.add_cube(x1, y1, x2, y2, 0, height * (10/13))
+            add_hinged_door(builder, x1, y1, x2, y2, 0, height * (10/13))
         else:
             builder.add_cube(x1, y1, x2, y2, 0, height)
         builder.create_mesh(f"{wall.type.capitalize()}_{index}")
 
         if wall.type == "door":
+            # Wall above the door: keep original (unrotated) bounds
             builder.add_cube(x1, y1, x2, y2, height * (10/13), height)
             builder.create_mesh(f"Wall_{index}")
     
