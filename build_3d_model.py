@@ -596,7 +596,22 @@ def build_3d_model(data: dict, sample_image: "Callable[[float, float], bool] | N
             # then put wall above. Average height of doors is 200cm relative to ceiling height 260cm,
             # to keep this for any height use a ratio. The wall object is also create separately for
             # applying textures.
-            add_hinged_door(builder, x1, y1, x2, y2, 0, height * (10/13))
+            tx1, ty1, tx2, ty2 = x1, y1, x2, y2
+            dx = tx2 - tx1
+            dy = ty2 - ty1
+
+            # Make the door leaf thinner (1/3 of current thickness).
+            # We keep the hinge edge fixed (at x1/y1 side) and shrink the smaller dimension.
+            if dx >= dy:
+                # Horizontal-ish door: thickness is along Y
+                if dy > 0:
+                    ty2 = ty1 + (dy / 3.0)
+            else:
+                # Vertical-ish door: thickness is along X
+                if dx > 0:
+                    tx2 = tx1 + (dx / 3.0)
+
+            add_hinged_door(builder, tx1, ty1, tx2, ty2, 0, height * (10/13))
         else:
             builder.add_cube(x1, y1, x2, y2, 0, height)
         builder.create_mesh(f"{wall.type.capitalize()}_{index}")
