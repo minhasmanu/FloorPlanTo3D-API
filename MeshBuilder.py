@@ -24,6 +24,7 @@ class MeshBuilder:
         self.vertex_stack: "list[list[float]]" = []
         self.index_stack: "list[int]" = []
         self._door_material_index: "int | None" = None
+        self._wall_material_index: "int | None" = None
         pass
     
     def add_quad(self, a, b, c, d, invert_normals = False):
@@ -185,7 +186,7 @@ class MeshBuilder:
             type=AccessorType.SCALAR.value,  # Single value per index
         ))
 
-        # Determine material (brown for doors)
+        # Determine material (brown for doors, light blue for walls and windows)
         material_index = None
         if isinstance(name, str) and name.startswith("Door_"):
             # Reuse a single brown material for all doors
@@ -199,6 +200,18 @@ class MeshBuilder:
                 )
                 self._door_material_index = create(self.gltf_materials, material)
             material_index = self._door_material_index
+        elif isinstance(name, str) and (name.startswith("Wall_") or name.startswith("Window_")):
+            # Reuse a single light blue material for all walls and windows
+            if self._wall_material_index is None:
+                pbr = PBRMetallicRoughness(
+                    baseColorFactor=[0.68, 0.85, 0.9, 1.0],  # light blue RGBA
+                )
+                material = Material(
+                    name="WallLightBlue",
+                    pbrMetallicRoughness=pbr,
+                )
+                self._wall_material_index = create(self.gltf_materials, material)
+            material_index = self._wall_material_index
 
         # 5. Build the Mesh Primitive
 

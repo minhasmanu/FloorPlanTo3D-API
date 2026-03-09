@@ -518,18 +518,23 @@ def build_3d_model(data: dict, sample_image: "Callable[[float, float], bool] | N
     rooms = find_rooms(walls, tolerance=0.1, sample_image=sample_image)
     data["points"] = walls_to_json(walls)
 
-    for name in rooms.keys():
-        quads = rooms[name]
-
-        for (x1, y1, x2, y2) in quads:
-            builder.add_quad(
-                [x1, y1, 0],
-                [x1, y2, 0],
-                [x2, y2, 0],
-                [x2, y1, 0],
-            )
-
-        builder.create_mesh([f"Room_{name}", f"Floor_r{name}"])
+    # Create a single floor covering all ground from min to max x,y axes
+    if walls:
+        # Find the bounding box of all walls
+        min_x = min(wall.x1 for wall in walls)
+        max_x = max(wall.x2 for wall in walls)
+        min_y = min(wall.y1 for wall in walls)
+        max_y = max(wall.y2 for wall in walls)
+        
+        # Create a single floor quad covering all ground
+        builder.add_quad(
+            [min_x, min_y, 0],
+            [min_x, max_y, 0],
+            [max_x, max_y, 0],
+            [max_x, min_y, 0],
+        )
+        
+        builder.create_mesh(["Floor", "Ground"])
 
     height = 2.6
 
@@ -596,7 +601,22 @@ def build_3d_model(data: dict, sample_image: "Callable[[float, float], bool] | N
             # then put wall above. Average height of doors is 200cm relative to ceiling height 260cm,
             # to keep this for any height use a ratio. The wall object is also create separately for
             # applying textures.
-            add_hinged_door(builder, x1, y1, x2, y2, 0, height * (10/13))
+            tx1, ty1, tx2, ty2 = x1, y1, x2, y2
+            dx = tx2 - tx1
+            dy = ty2 - ty1
+
+            # Make the door leaf thinner (1/3 of current thickness).
+            # We keep the hinge edge fixed (at x1/y1 side) and shrink the smaller dimension.
+            if dx >= dy:
+                # Horizontal-ish door: thickness is along Y
+                if dy > 0:
+                    ty2 = ty1 + (dy / 3.0)
+            else:
+                # Vertical-ish door: thickness is along X
+                if dx > 0:
+                    tx2 = tx1 + (dx / 3.0)
+
+            add_hinged_door(builder, tx1, ty1, tx2, ty2, 0, height * (10/13))
         else:
             builder.add_cube(x1, y1, x2, y2, 0, height)
         builder.create_mesh(f"{wall.type.capitalize()}_{index}")
