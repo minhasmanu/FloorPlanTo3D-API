@@ -1,0 +1,28 @@
+curl -X POST http://172.20.10.2:8081/ ^
+ -F "image=@F:\path\to\floorplan.jpg" ^
+ --output output.glb
+
+curl.exe -X POST http://51.20.208.173:8081/ ^
+ -F "image=@F:\path\to\floorplan.jpg" ^
+ --output result.glb
+
+ 
+(imageTo3D_py36) ubuntu@ip-172-31-34-85:~/FloorPlanTo3D-API$ which gunicorn
+
+
+/home/ubuntu/miniconda3/envs/imageTo3D_py36/bin/gunicorn
+
+
+
+(imageTo3D_py36) ubuntu@ip-172-31-34-85:~/FloorPlanTo3D-API$ which python
+/home/ubuntu/miniconda3/envs/imageTo3D_py36/bin/python
+
+(imageTo3D_py36) ubuntu@ip-172-31-34-85:~/FloorPlanTo3D-API$ pwd
+/home/ubuntu/FloorPlanTo3D-API
+(imageTo3D_py36) ubuntu@ip-172-31-34-85:~/FloorPlanTo3D-API$
+
+cd C:\aws
+ssh -i keypairfloorplanAmzonEc2.pem ubuntu@51.21.148.216
+
+conda activate imageTo3D
+

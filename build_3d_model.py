@@ -518,18 +518,23 @@ def build_3d_model(data: dict, sample_image: "Callable[[float, float], bool] | N
     rooms = find_rooms(walls, tolerance=0.1, sample_image=sample_image)
     data["points"] = walls_to_json(walls)
 
-    for name in rooms.keys():
-        quads = rooms[name]
-
-        for (x1, y1, x2, y2) in quads:
-            builder.add_quad(
-                [x1, y1, 0],
-                [x1, y2, 0],
-                [x2, y2, 0],
-                [x2, y1, 0],
-            )
-
-        builder.create_mesh([f"Room_{name}", f"Floor_r{name}"])
+    # Create a single floor covering all ground from min to max x,y axes
+    if walls:
+        # Find the bounding box of all walls
+        min_x = min(wall.x1 for wall in walls)
+        max_x = max(wall.x2 for wall in walls)
+        min_y = min(wall.y1 for wall in walls)
+        max_y = max(wall.y2 for wall in walls)
+        
+        # Create a single floor quad covering all ground
+        builder.add_quad(
+            [min_x, min_y, 0],
+            [min_x, max_y, 0],
+            [max_x, max_y, 0],
+            [max_x, min_y, 0],
+        )
+        
+        builder.create_mesh(["Floor", "Ground"])
 
     height = 2.6
 
