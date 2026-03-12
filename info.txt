@@ -26,3 +26,4 @@ ssh -i keypairfloorplanAmzonEc2.pem ubuntu@51.21.148.216
 
 conda activate imageTo3D
 
+F:\FloorPlanTo3D-API>python application.py

@@ -2,6 +2,7 @@ import os
 import PIL
 import numpy
 import uuid
+import json
 from datetime import datetime
 
 
@@ -59,7 +60,7 @@ MODEL_NAME = "mask_rcnn_hq"
 WEIGHTS_FILE_NAME = 'maskrcnn_15_epochs.h5'
 
 application=Flask(__name__)
-cors = CORS(application, resources={r"/*": {"origins": "*"}})
+CORS(application)
 
 class PredictionConfig(Config):
 	# define the name of the configuration
@@ -197,11 +198,40 @@ def prediction():
 	with open(filepath, 'wb') as f:
 		gltf.write_glb(f)
 	
-	# Return JSON response
+	history_file = os.path.join(ROOT_DIR, "history.json")
+
+# read history
+	if os.path.exists(history_file):
+		with open(history_file, "r") as f:
+			history = json.load(f)
+	else:
+		history = []
+
+	entry = {
+		"id": uuid.uuid4().hex,
+		"image": image_filename,
+		"model": filename,
+		"image_url": f"/uploads/{image_filename}",
+		"model_url": f"/outputs/{filename}",
+		"time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+	}
+
+	history.append(entry)
+
+	with open(history_file, "w") as f:
+		json.dump(history, f, indent=4)
+
+	# return response to frontend
 	return jsonify({
 		"model": filename,
-		"url": f"/outputs/{filename}"
+		"url": f"/outputs/{filename}",
+		"image": image_filename,
+		"image_url": f"/uploads/{image_filename}"
 	})
+
+@application.route('/uploads/<filename>')
+def get_uploaded_image(filename):
+    return send_from_directory(UPLOADS_FOLDER, filename)
 
 
 @application.route('/outputs/<filename>', methods=['GET'])
@@ -215,16 +245,55 @@ def download_model(filename):
 
 @application.route('/history', methods=['GET'])
 def get_history():
-	"""List all generated GLB files in the outputs folder."""
-	try:
-		files = [f for f in os.listdir(OUTPUTS_FOLDER) if f.endswith('.glb')]
-		files.sort()  # Sort alphabetically
-		models = [{"name": f, "url": f"/outputs/{f}"} for f in files]
-		return jsonify(models)
-	except Exception as e:
-		return jsonify({"error": "Unable to list files"}), 500
 
+    history_file = os.path.join(ROOT_DIR, "history.json")
+
+    if not os.path.exists(history_file):
+        return jsonify([])
+
+    with open(history_file, "r") as f:
+        history = json.load(f)
+
+    history.reverse()
+
+    return jsonify(history)
     
+
+@application.route('/delete/<id>', methods=['DELETE'])
+def delete_item(id):
+
+    history_file = os.path.join(ROOT_DIR, "history.json")
+
+    with open(history_file, "r") as f:
+        history = json.load(f)
+
+    updated = []
+    deleted_item = None
+
+    for item in history:
+        if item["id"] == id:
+            deleted_item = item
+        else:
+            updated.append(item)
+
+    if deleted_item:
+
+        image_path = os.path.join(UPLOADS_FOLDER, deleted_item["image"])
+        model_path = os.path.join(OUTPUTS_FOLDER, deleted_item["model"])
+
+        if os.path.exists(image_path):
+            os.remove(image_path)
+
+        if os.path.exists(model_path):
+            os.remove(model_path)
+
+    with open(history_file, "w") as f:
+        json.dump(updated, f, indent=4)
+
+    return jsonify({"message": "Deleted"})
+
+
+
 if __name__ =='__main__':
 	application.debug=True
 	print('===========before running==========')
